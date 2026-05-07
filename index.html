@@ -320,24 +320,29 @@ input[type=range]::-webkit-slider-thumb{
 const CV_TABLE=[0,17542,45615,85936,146084,214109,294165,377937,465489,556869,652119,674948,698588,723069,748424,774688,801897,830069,859231,889416,920662,953005,986484,1021138,1057008,1094138,1132570,1172352,1213530,1256152,1300271,1345938,1393207,1442136,1492781,1545205,1599468,1655636,1713776,1773957,1836251,1900730,1967471,2036554,2108059,2182071,2258677,2337968,2420035,2504977,2592893,2683887,2778067,2875544,2976433,3080851,3188920,3300766,3416520,3536316,3660297,3788609,3921403,4058838,4201075,4348284,4500640,4658324,4821524,4990437,5165273,5346252,5533508,5727306,5927875,6135449,6350261,6572568,6802655,7040802,7287278,7542386,7806467,8079849];
 const PRESETS={conservative:{sister:5,pool3:5,dca:5},moderate:{sister:20,pool3:8,dca:8},aggressive:{sister:40,pool3:12,dca:12},radical:{sister:60,pool3:20,dca:20}};
 const STORAGE_KEY='wealth_manager_data';
+const DATA_VERSION='v2';
 const INS_START=new Date('2023-04-26');
 
 const DEFAULT_DATA={
   profile:{birth_year:2001,target_age:40,target_amount:10000000,annual_income:210000,annual_expense:30000,salary_growth:0.05},
   assets:[
     {id:'insurance',name:'昆仑健康乐享年年',type:'insurance',total_paid:400000,annual_payment:100000,payment_years:5,start_date:'2023-04-26'},
-    {id:'sister',name:'姐姐风险投资',type:'high_risk',invested:180000,current_value:180000,expected_return:0.40},
-    {id:'pool3',name:'第三池(红利+指数)',type:'stock',invested:500000,current_value:500000,expected_return:0.10}
+    {id:'sister',name:'姐姐风险投资',type:'high_risk',invested:147800,current_value:180000,expected_return:0.40},
+    {id:'cash',name:'现金储备',type:'cash',invested:55137.65,current_value:55137.65,expected_return:0.02},
+    {id:'pool3',name:'第三池(红利+指数)',type:'stock',invested:0,current_value:0,expected_return:0.10}
   ],
   monthly_invest:{amount:12500,expected_return:0.10},
-  history:[]
+  history:[
+    {date:'2026-05-07',total:635137.65,breakdown:{insurance:85936,sister:180000,cash:55137.65,pool3:0}}
+  ]
 };
 
 let data;
 function loadData(){
   const s=localStorage.getItem(STORAGE_KEY);
-  if(s){try{data=JSON.parse(s)}catch(e){data=JSON.parse(JSON.stringify(DEFAULT_DATA))}}
-  else{data=JSON.parse(JSON.stringify(DEFAULT_DATA))}
+  const ver=localStorage.getItem(STORAGE_KEY+'_ver');
+  if(s && ver===DATA_VERSION){try{data=JSON.parse(s)}catch(e){data=JSON.parse(JSON.stringify(DEFAULT_DATA))}}
+  else{data=JSON.parse(JSON.stringify(DEFAULT_DATA));localStorage.setItem(STORAGE_KEY+'_ver',DATA_VERSION)}
 }
 function saveData(){localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}
 loadData();
@@ -528,6 +533,8 @@ function projectScenario(rSis,rP3,rDca,years){
   const insCV=CV_TABLE[Math.min(getInsuranceYear()-1+years,83)]||CV_TABLE[83];
   const sis=getAsset('sister').current_value*Math.pow(1+rSis/100,years);
   const p3=getAsset('pool3').current_value*Math.pow(1+rP3/100,years);
+  const cashAsset=getAsset('cash');
+  const cashFV=cashAsset?cashAsset.current_value*Math.pow(1.02,years):0;
   // DCA with salary growth
   let dcaTotal=0;
   const annualSave=data.monthly_invest.amount*12;
@@ -535,7 +542,7 @@ function projectScenario(rSis,rP3,rDca,years){
     const contribution=annualSave*Math.pow(1+data.profile.salary_growth,y);
     dcaTotal+=contribution*Math.pow(1+rDca/100,years-y-0.5);
   }
-  return {insurance:insCV,sister:sis,pool3:p3,dca:dcaTotal,total:insCV+sis+p3+dcaTotal};
+  return {insurance:insCV,sister:sis,pool3:p3,cash:cashFV,dca:dcaTotal,total:insCV+sis+p3+cashFV+dcaTotal};
 }
 function updateScenario(){
   const rS=+document.getElementById('sliderSister').value;
@@ -556,6 +563,7 @@ function updateScenario(){
     <div class="stat-row"><span class="stat-label">保险现金价值</span><span class="stat-value">${fmt(result.insurance)}</span></div>
     <div class="stat-row"><span class="stat-label">姐姐投资</span><span class="stat-value">${fmt(result.sister)}</span></div>
     <div class="stat-row"><span class="stat-label">第三池</span><span class="stat-value">${fmt(result.pool3)}</span></div>
+    <div class="stat-row"><span class="stat-label">现金储备</span><span class="stat-value">${fmt(result.cash)}</span></div>
     <div class="stat-row"><span class="stat-label">定投积累</span><span class="stat-value">${fmt(result.dca)}</span></div>
   `;
 
