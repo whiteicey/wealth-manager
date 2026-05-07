@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>财富管理中心</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#0d1117;--card:#161b22;--border:#21262d;--surface:#1c2129;
+--gold:#d4a574;--gold2:#c9a96e;--gold3:#b8944f;--gold-dim:rgba(212,165,116,.15);
+--text:#e6edf3;--text2:#8b949e;--text3:#484f58;
+--green:#3fb950;--red:#f85149;--blue:#58a6ff;
+--radius:12px;--radius-sm:8px;
+}
+html{font-size:16px;scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+h1,h2,h3,.hero-num{font-family:'Playfair Display',serif}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Layout */
+.app-header{
+  background:linear-gradient(135deg,#0d1117 0%,#161b22 100%);
+  border-bottom:1px solid var(--border);
+  padding:16px 24px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);
+}
+.app-logo{font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--gold);font-weight:700;letter-spacing:1px}
+.app-subtitle{font-size:.75rem;color:var(--text2);margin-left:12px}
+.tab-bar{
+  display:flex;gap:4px;padding:8px 24px;background:var(--bg);
+  border-bottom:1px solid var(--border);overflow-x:auto;
+  position:sticky;top:57px;z-index:99;
+}
+.tab-btn{
+  padding:10px 20px;border:none;background:transparent;color:var(--text2);
+  font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:500;
+  border-radius:var(--radius-sm);cursor:pointer;white-space:nowrap;transition:.2s;
+}
+.tab-btn:hover{color:var(--text);background:var(--surface)}
+.tab-btn.active{color:var(--gold);background:var(--gold-dim);font-weight:600}
+.tab-content{display:none;padding:24px;max-width:1200px;margin:0 auto;animation:fadeIn .3s}
+.tab-content.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* Cards */
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:24px;margin-bottom:16px;transition:.2s;
+}
+.card:hover{border-color:var(--gold3)}
+.card-title{font-size:.8rem;color:var(--text2);text-transform:uppercase;letter-spacing:2px;margin-bottom:12px}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+
+/* Hero number */
+.hero-section{text-align:center;padding:40px 0 32px}
+.hero-label{font-size:.85rem;color:var(--text2);letter-spacing:3px;margin-bottom:8px}
+.hero-num{font-size:3.2rem;color:var(--gold);font-weight:700;line-height:1.2}
+.hero-sub{font-size:.9rem;color:var(--text2);margin-top:8px}
+
+/* Stat */
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+.stat-row:last-child{border:none}
+.stat-label{color:var(--text2);font-size:.85rem}
+.stat-value{font-weight:600;font-size:.95rem}
+.stat-value.positive{color:var(--green)}
+.stat-value.negative{color:var(--red)}
+
+/* Editable */
+.editable{cursor:pointer;border-bottom:1px dashed var(--gold3);padding-bottom:1px}
+.editable:hover{color:var(--gold)}
+.edit-input{
+  background:var(--surface);border:1px solid var(--gold);color:var(--gold);
+  padding:4px 8px;border-radius:4px;font-size:.9rem;width:120px;
+  font-family:'DM Sans',sans-serif;outline:none;
+}
+
+/* Buttons */
+.btn{
+  padding:10px 24px;border:none;border-radius:var(--radius-sm);cursor:pointer;
+  font-family:'DM Sans',sans-serif;font-size:.85rem;font-weight:600;transition:.2s;
+}
+.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold3));color:#0d1117}
+.btn-gold:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2)}
+.btn-outline:hover{border-color:var(--gold);color:var(--gold)}
+.btn-outline.active{border-color:var(--gold);color:var(--gold);background:var(--gold-dim)}
+.btn-group{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
+
+/* Progress */
+.progress-bar{background:var(--surface);border-radius:20px;height:28px;overflow:hidden;position:relative}
+.progress-fill{
+  height:100%;border-radius:20px;
+  background:linear-gradient(90deg,var(--gold3),var(--gold));
+  transition:width .6s ease;position:relative;min-width:2%;
+}
+.progress-text{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:.75rem;font-weight:600;color:#0d1117}
+
+/* Slider */
+.slider-group{margin:16px 0}
+.slider-label{display:flex;justify-content:space-between;margin-bottom:6px;font-size:.85rem}
+.slider-label span:last-child{color:var(--gold);font-weight:600}
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:6px;border-radius:3px;
+  background:var(--surface);outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--gold);cursor:pointer;border:2px solid var(--card);
+}
+
+/* Table */
+.data-table{width:100%;border-collapse:collapse;font-size:.85rem}
+.data-table th{color:var(--text2);font-weight:500;text-align:left;padding:10px 12px;border-bottom:1px solid var(--border)}
+.data-table td{padding:10px 12px;border-bottom:1px solid var(--border)}
+.data-table tr.highlight{background:var(--gold-dim)}
+.data-table tr:hover{background:rgba(255,255,255,.02)}
+
+/* Chart container */
+.chart-wrap{position:relative;margin:20px 0;max-height:400px}
+.chart-wrap canvas{width:100%!important}
+
+/* Insurance ring */
+.ring-container{display:flex;align-items:center;gap:24px;margin:20px 0}
+.ring-svg{width:120px;height:120px;flex-shrink:0}
+.ring-info{flex:1}
+
+/* Responsive */
+@media(max-width:768px){
+  .hero-num{font-size:2.2rem}
+  .tab-btn{padding:8px 14px;font-size:.8rem}
+  .card-grid{grid-template-columns:1fr}
+  .tab-content{padding:16px}
+  .ring-container{flex-direction:column;align-items:flex-start}
+}
+
+/* Input group for calculator */
+.input-group{margin:12px 0}
+.input-group label{display:block;font-size:.8rem;color:var(--text2);margin-bottom:4px}
+.input-group input{
+  width:100%;padding:10px 12px;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text);font-size:.9rem;
+  font-family:'DM Sans',sans-serif;outline:none;transition:.2s;
+}
+.input-group input:focus{border-color:var(--gold)}
+
+.comparison-table{overflow-x:auto;margin-top:20px}
+.milestone{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:600;background:var(--gold-dim);color:var(--gold);margin:2px}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div style="display:flex;align-items:baseline">
+    <div class="app-logo">财富管理中心</div>
+    <span class="app-subtitle">— 千万目标 · 十五年计划</span>
+  </div>
+  <div style="font-size:.75rem;color:var(--text3)" id="headerDate"></div>
+</header>
+
+<nav class="tab-bar">
+  <button class="tab-btn active" data-tab="overview">资产总览</button>
+  <button class="tab-btn" data-tab="goal">目标追踪</button>
+  <button class="tab-btn" data-tab="scenario">场景模拟</button>
+  <button class="tab-btn" data-tab="dca">定投计算器</button>
+  <button class="tab-btn" data-tab="insurance">保险追踪</button>
+</nav>
+
+<!-- Tab 1: 资产总览 -->
+<section class="tab-content active" id="tab-overview">
+  <div class="hero-section">
+    <div class="hero-label">资 产 总 值</div>
+    <div class="hero-num" id="totalAssets">—</div>
+    <div class="hero-sub" id="totalPL"></div>
+  </div>
+  <div style="max-width:360px;margin:0 auto 32px">
+    <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
+  </div>
+  <div class="card-grid" id="assetCards"></div>
+  <div style="text-align:center;margin-top:24px">
+    <button class="btn btn-gold" onclick="recordSnapshot()">记录净值</button>
+    <p style="font-size:.75rem;color:var(--text3);margin-top:8px">点击记录当前资产快照到历史</p>
+  </div>
+</section>
+
+<!-- Tab 2: 目标追踪 -->
+<section class="tab-content" id="tab-goal">
+  <div class="card">
+    <div class="card-title">目标进度</div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+      <span style="font-size:.85rem;color:var(--text2)">当前 / 目标</span>
+      <span style="font-size:.85rem;font-weight:600" id="goalProgressText">—</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="goalProgressBar" style="width:0%">
+        <span class="progress-text" id="goalProgressPct">0%</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-grid">
+    <div class="card"><div class="card-title">剩余年限</div><div class="stat-value" style="font-size:1.8rem;font-family:'Playfair Display'" id="goalYearsLeft">—</div></div>
+    <div class="card"><div class="card-title">每月需存</div><div class="stat-value" style="font-size:1.8rem;font-family:'Playfair Display'" id="goalMonthlySave">—</div></div>
+    <div class="card"><div class="card-title">预计达标年龄</div><div class="stat-value" style="font-size:1.8rem;font-family:'Playfair Display'" id="goalAge">—</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">历史净值曲线</div>
+    <div class="chart-wrap"><canvas id="historyChart"></canvas></div>
+    <p style="font-size:.75rem;color:var(--text3);margin-top:8px">在"资产总览"中点击"记录净值"添加数据点</p>
+  </div>
+</section>
+
+<!-- Tab 3: 场景模拟 -->
+<section class="tab-content" id="tab-scenario">
+  <div class="card">
+    <div class="card-title">参数调节</div>
+    <div class="btn-group">
+      <button class="btn btn-outline" onclick="applyPreset('conservative')">保守</button>
+      <button class="btn btn-outline" onclick="applyPreset('moderate')">中等</button>
+      <button class="btn btn-outline" onclick="applyPreset('aggressive')">进取</button>
+      <button class="btn btn-outline" onclick="applyPreset('radical')">激进</button>
+    </div>
+    <div class="slider-group">
+      <div class="slider-label"><span>姐姐投资年化收益</span><span id="sliderSisterVal">40%</span></div>
+      <input type="range" id="sliderSister" min="-50" max="60" value="40" oninput="updateScenario()">
+    </div>
+    <div class="slider-group">
+      <div class="slider-label"><span>第三池年化收益</span><span id="sliderPool3Val">10%</span></div>
+      <input type="range" id="sliderPool3" min="0" max="30" value="10" oninput="updateScenario()">
+    </div>
+    <div class="slider-group">
+      <div class="slider-label"><span>定投年化收益</span><span id="sliderDcaVal">10%</span></div>
+      <input type="range" id="sliderDca" min="0" max="25" value="10" oninput="updateScenario()">
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">40岁预计总资产</div>
+    <div class="hero-num" id="scenarioTotal" style="font-size:2.4rem">—</div>
+    <div id="scenarioBreakdown" style="margin-top:16px"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">15年增长轨迹</div>
+    <div class="chart-wrap"><canvas id="scenarioChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">预设方案对比</div>
+    <div class="comparison-table">
+      <table class="data-table" id="comparisonTable"></table>
+    </div>
+  </div>
+</section>
+
+<!-- Tab 4: 定投计算器 -->
+<section class="tab-content" id="tab-dca">
+  <div class="card">
+    <div class="card-title">定投参数</div>
+    <div class="btn-group">
+      <button class="btn btn-outline" onclick="setDca(5000)">月投5000</button>
+      <button class="btn btn-outline" onclick="setDca(10000)">月投1万</button>
+      <button class="btn btn-outline" onclick="setDca(15000)">月投1.5万</button>
+      <button class="btn btn-outline" onclick="setDca(20000)">月投2万</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+      <div class="input-group"><label>每月定投金额 (元)</label><input type="number" id="dcaAmount" value="12500" oninput="calcDca()"></div>
+      <div class="input-group"><label>年化收益率 (%)</label><input type="number" id="dcaReturn" value="10" step="0.5" oninput="calcDca()"></div>
+      <div class="input-group"><label>投资年限</label><input type="number" id="dcaYears" value="15" oninput="calcDca()"></div>
+    </div>
+  </div>
+  <div class="card-grid">
+    <div class="card"><div class="card-title">终值</div><div class="stat-value" style="font-size:1.6rem;font-family:'Playfair Display';color:var(--gold)" id="dcaEnd">—</div></div>
+    <div class="card"><div class="card-title">总投入</div><div class="stat-value" style="font-size:1.6rem;font-family:'Playfair Display'" id="dcaInvested">—</div></div>
+    <div class="card"><div class="card-title">总收益</div><div class="stat-value positive" style="font-size:1.6rem;font-family:'Playfair Display'" id="dcaProfit">—</div></div>
+    <div class="card"><div class="card-title">收益倍数</div><div class="stat-value" style="font-size:1.6rem;font-family:'Playfair Display';color:var(--gold)" id="dcaMultiple">—</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">资产增长曲线</div>
+    <div class="chart-wrap"><canvas id="dcaChart"></canvas></div>
+  </div>
+</section>
+
+<!-- Tab 5: 保险追踪 -->
+<section class="tab-content" id="tab-insurance">
+  <div class="card">
+    <div class="card-title">保单状态</div>
+    <div class="ring-container">
+      <svg class="ring-svg" viewBox="0 0 120 120" id="insuranceRing"></svg>
+      <div class="ring-info">
+        <div style="font-size:1.2rem;font-weight:600;margin-bottom:4px">昆仑健康 · 乐享年年</div>
+        <div style="font-size:.8rem;color:var(--text2)">终身增额寿险 · 年缴 10万 × 5年</div>
+        <div style="font-size:.8rem;color:var(--text2);margin-top:4px">起保日期: 2023-04-26</div>
+        <div style="font-size:.85rem;margin-top:8px">当前保单年度: <span style="color:var(--gold);font-weight:600" id="insCurrentYear">—</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="card-grid">
+    <div class="card"><div class="card-title">已缴保费</div><div class="stat-value" style="font-size:1.5rem;font-family:'Playfair Display'" id="insPaid">—</div></div>
+    <div class="card"><div class="card-title">当前现金价值</div><div class="stat-value" style="font-size:1.5rem;font-family:'Playfair Display';color:var(--gold)" id="insCV">—</div></div>
+    <div class="card"><div class="card-title">退保损失</div><div class="stat-value negative" style="font-size:1.5rem;font-family:'Playfair Display'" id="insLoss">—</div></div>
+    <div class="card"><div class="card-title">回本年份</div><div class="stat-value" style="font-size:1.5rem;font-family:'Playfair Display';color:var(--green)" id="insBreakEven">—</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">现金价值增长曲线</div>
+    <div class="chart-wrap"><canvas id="insChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">现金价值明细表</div>
+    <div style="max-height:500px;overflow-y:auto">
+      <table class="data-table" id="insTable"></table>
+    </div>
+  </div>
+</section>
+
+<script>
+// ===== DATA =====
+const CV_TABLE=[0,17542,45615,85936,146084,214109,294165,377937,465489,556869,652119,674948,698588,723069,748424,774688,801897,830069,859231,889416,920662,953005,986484,1021138,1057008,1094138,1132570,1172352,1213530,1256152,1300271,1345938,1393207,1442136,1492781,1545205,1599468,1655636,1713776,1773957,1836251,1900730,1967471,2036554,2108059,2182071,2258677,2337968,2420035,2504977,2592893,2683887,2778067,2875544,2976433,3080851,3188920,3300766,3416520,3536316,3660297,3788609,3921403,4058838,4201075,4348284,4500640,4658324,4821524,4990437,5165273,5346252,5533508,5727306,5927875,6135449,6350261,6572568,6802655,7040802,7287278,7542386,7806467,8079849];
+const PRESETS={conservative:{sister:5,pool3:5,dca:5},moderate:{sister:20,pool3:8,dca:8},aggressive:{sister:40,pool3:12,dca:12},radical:{sister:60,pool3:20,dca:20}};
+const STORAGE_KEY='wealth_manager_data';
+const INS_START=new Date('2023-04-26');
+
+const DEFAULT_DATA={
+  profile:{birth_year:2001,target_age:40,target_amount:10000000,annual_income:210000,annual_expense:30000,salary_growth:0.05},
+  assets:[
+    {id:'insurance',name:'昆仑健康乐享年年',type:'insurance',total_paid:400000,annual_payment:100000,payment_years:5,start_date:'2023-04-26'},
+    {id:'sister',name:'姐姐风险投资',type:'high_risk',invested:180000,current_value:180000,expected_return:0.40},
+    {id:'pool3',name:'第三池(红利+指数)',type:'stock',invested:500000,current_value:500000,expected_return:0.10}
+  ],
+  monthly_invest:{amount:12500,expected_return:0.10},
+  history:[]
+};
+
+let data;
+function loadData(){
+  const s=localStorage.getItem(STORAGE_KEY);
+  if(s){try{data=JSON.parse(s)}catch(e){data=JSON.parse(JSON.stringify(DEFAULT_DATA))}}
+  else{data=JSON.parse(JSON.stringify(DEFAULT_DATA))}
+}
+function saveData(){localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}
+loadData();
+
+// ===== UTILS =====
+function fmt(n){
+  if(Math.abs(n)>=100000000)return (n/100000000).toFixed(2)+'亿';
+  if(Math.abs(n)>=10000)return (n/10000).toFixed(2)+'万';
+  return n.toFixed(0)+'元';
+}
+function fmtFull(n){return n.toLocaleString('zh-CN',{minimumFractionDigits:0,maximumFractionDigits:0})+'元'}
+function pct(n){return (n*100).toFixed(1)+'%'}
+
+function getInsuranceCV(){
+  const now=new Date();
+  const years=(now-INS_START)/(365.25*86400000);
+  const y=Math.floor(years);
+  const frac=years-y;
+  if(y<0)return 0;
+  if(y>=83)return CV_TABLE[83];
+  const lo=CV_TABLE[y]||0, hi=CV_TABLE[y+1]||lo;
+  return lo+(hi-lo)*frac;
+}
+function getInsuranceYear(){return Math.floor((new Date()-INS_START)/(365.25*86400000))+1}
+function getPaidSoFar(){const y=getInsuranceYear();return Math.min(y,5)*100000}
+function getAsset(id){return data.assets.find(a=>a.id===id)}
+function getTotalAssets(){
+  const ins=getInsuranceCV();
+  const sis=getAsset('sister').current_value;
+  const p3=getAsset('pool3').current_value;
+  return ins+sis+p3;
+}
+function getTotalInvested(){
+  return getPaidSoFar()+getAsset('sister').invested+getAsset('pool3').invested;
+}
+
+// ===== CHARTS REGISTRY =====
+const charts={};
+function getChart(id,cfg){
+  if(charts[id]){charts[id].destroy()}
+  const ctx=document.getElementById(id).getContext('2d');
+  charts[id]=new Chart(ctx,cfg);
+  return charts[id];
+}
+const chartColors={gold:'#d4a574',gold2:'#c9a96e',green:'#3fb950',blue:'#58a6ff',red:'#f85149',purple:'#bc8cff',text2:'#8b949e'};
+Chart.defaults.color='#8b949e';
+Chart.defaults.borderColor='#21262d';
+Chart.defaults.font.family="'DM Sans',sans-serif";
+
+// ===== TAB SWITCHING =====
+document.querySelectorAll('.tab-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById('tab-'+b.dataset.tab).classList.add('active');
+    refreshCurrentTab(b.dataset.tab);
+  });
+});
+function refreshCurrentTab(tab){
+  if(tab==='overview')renderOverview();
+  else if(tab==='goal')renderGoal();
+  else if(tab==='scenario')updateScenario();
+  else if(tab==='dca')calcDca();
+  else if(tab==='insurance')renderInsurance();
+}
+
+// ===== TAB 1: OVERVIEW =====
+function renderOverview(){
+  const total=getTotalAssets();
+  const invested=getTotalInvested();
+  const pl=total-invested;
+  document.getElementById('totalAssets').textContent=fmt(total);
+  document.getElementById('totalPL').innerHTML=`总投入 ${fmt(invested)} &nbsp;|&nbsp; 盈亏 <span style="color:${pl>=0?'var(--green)':'var(--red)'}">${pl>=0?'+':''}${fmt(pl)} (${pl>=0?'+':''}${(pl/invested*100).toFixed(1)}%)</span>`;
+
+  const ins=getInsuranceCV(), sis=getAsset('sister').current_value, p3=getAsset('pool3').current_value;
+  // Pie
+  getChart('pieChart',{
+    type:'doughnut',
+    data:{labels:['保险','姐姐投资','第三池'],datasets:[{data:[ins,sis,p3],backgroundColor:[chartColors.gold,chartColors.red,chartColors.blue],borderWidth:0,hoverOffset:8}]},
+    options:{cutout:'65%',plugins:{legend:{position:'bottom',labels:{padding:16,usePointStyle:true,pointStyle:'circle'}}}}
+  });
+
+  // Cards
+  const cards=document.getElementById('assetCards');
+  const paid=getPaidSoFar();
+  const insPL=ins-paid;
+  const sisA=getAsset('sister'), p3A=getAsset('pool3');
+  const sisPL=sisA.current_value-sisA.invested, p3PL=p3A.current_value-p3A.invested;
+  const nextPayDate=getInsuranceYear()<=4?`${2023+getInsuranceYear()}-04-26`:'已缴清';
+
+  cards.innerHTML=`
+    ${assetCard('保险','昆仑健康乐享年年',paid,ins,insPL,`下次缴费: ${nextPayDate}`)}
+    ${assetCard('高风险','姐姐风险投资',sisA.invested,sisA.current_value,sisPL,`预期年化: ${pct(sisA.expected_return)}`,'sister')}
+    ${assetCard('红利+指数','第三池(红利+指数)',p3A.invested,p3A.current_value,p3PL,`预期年化: ${pct(p3A.expected_return)}`,'pool3')}
+  `;
+}
+function assetCard(tag,name,invested,current,pl,extra,editId){
+  const plClass=pl>=0?'positive':'negative';
+  const valDisplay=editId?`<span class="editable" onclick="startEdit(this,'${editId}')">${fmt(current)}</span>`:fmt(current);
+  return `<div class="card">
+    <div class="card-title">${tag}</div>
+    <div style="font-size:1.1rem;font-weight:600;margin-bottom:12px">${name}</div>
+    <div class="stat-row"><span class="stat-label">投入金额</span><span class="stat-value">${fmt(invested)}</span></div>
+    <div class="stat-row"><span class="stat-label">当前价值</span><span class="stat-value">${valDisplay}</span></div>
+    <div class="stat-row"><span class="stat-label">盈亏</span><span class="stat-value ${plClass}">${pl>=0?'+':''}${fmt(pl)} (${invested?((pl/invested*100).toFixed(1)):'0'}%)</span></div>
+    <div style="font-size:.8rem;color:var(--text2);margin-top:8px">${extra}</div>
+  </div>`;
+}
+function startEdit(el,assetId){
+  const asset=getAsset(assetId);
+  const input=document.createElement('input');
+  input.className='edit-input';
+  input.type='number';
+  input.value=Math.round(asset.current_value);
+  el.replaceWith(input);
+  input.focus();
+  input.select();
+  const finish=()=>{
+    const v=parseFloat(input.value);
+    if(!isNaN(v)&&v>=0){asset.current_value=v;saveData()}
+    renderOverview();
+  };
+  input.addEventListener('blur',finish);
+  input.addEventListener('keydown',e=>{if(e.key==='Enter')finish();if(e.key==='Escape'){renderOverview()}});
+}
+function recordSnapshot(){
+  const ins=getInsuranceCV(),sis=getAsset('sister').current_value,p3=getAsset('pool3').current_value;
+  const total=ins+sis+p3;
+  data.history.push({date:new Date().toISOString().slice(0,10),total,breakdown:{insurance:Math.round(ins),sister:Math.round(sis),pool3:Math.round(p3)}});
+  saveData();
+  alert('已记录净值快照: '+fmt(total));
+}
+
+// ===== TAB 2: GOAL =====
+function renderGoal(){
+  const total=getTotalAssets();
+  const target=data.profile.target_amount;
+  const p=Math.min(total/target*100,100);
+  document.getElementById('goalProgressText').textContent=`${fmt(total)} / ${fmt(target)}`;
+  document.getElementById('goalProgressBar').style.width=p+'%';
+  document.getElementById('goalProgressPct').textContent=p.toFixed(1)+'%';
+
+  const now=new Date();
+  const age=now.getFullYear()-data.profile.birth_year;
+  const yearsLeft=Math.max(0,data.profile.target_age-age);
+  document.getElementById('goalYearsLeft').textContent=yearsLeft+'年';
+
+  const gap=target-total;
+  const monthlyNeeded=gap>0?(gap/(yearsLeft*12)):0;
+  document.getElementById('goalMonthlySave').textContent=fmt(monthlyNeeded);
+  document.getElementById('goalAge').textContent=data.profile.target_age+'岁';
+
+  // History chart
+  const hist=data.history;
+  if(hist.length>0){
+    const milestones=[1000000,2000000,5000000,10000000];
+    getChart('historyChart',{
+      type:'line',
+      data:{
+        labels:hist.map(h=>h.date),
+        datasets:[{label:'总资产',data:hist.map(h=>h.total),borderColor:chartColors.gold,backgroundColor:'rgba(212,165,116,.1)',fill:true,tension:.3,pointRadius:4,pointBackgroundColor:chartColors.gold}]
+      },
+      options:{
+        scales:{y:{ticks:{callback:v=>fmt(v)}}},
+        plugins:{
+          legend:{display:false},
+          annotation:undefined
+        }
+      }
+    });
+  } else {
+    getChart('historyChart',{type:'line',data:{labels:['暂无数据'],datasets:[{data:[0],borderColor:chartColors.gold}]},options:{plugins:{legend:{display:false}}}});
+  }
+}
+
+// ===== TAB 3: SCENARIO =====
+function applyPreset(key){
+  const p=PRESETS[key];
+  document.getElementById('sliderSister').value=p.sister;
+  document.getElementById('sliderPool3').value=p.pool3;
+  document.getElementById('sliderDca').value=p.dca;
+  document.querySelectorAll('#tab-scenario .btn-outline').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  updateScenario();
+}
+function projectScenario(rSis,rP3,rDca,years){
+  const insCV=CV_TABLE[Math.min(getInsuranceYear()-1+years,83)]||CV_TABLE[83];
+  const sis=getAsset('sister').current_value*Math.pow(1+rSis/100,years);
+  const p3=getAsset('pool3').current_value*Math.pow(1+rP3/100,years);
+  // DCA with salary growth
+  let dcaTotal=0;
+  const annualSave=data.monthly_invest.amount*12;
+  for(let y=0;y<years;y++){
+    const contribution=annualSave*Math.pow(1+data.profile.salary_growth,y);
+    dcaTotal+=contribution*Math.pow(1+rDca/100,years-y-0.5);
+  }
+  return {insurance:insCV,sister:sis,pool3:p3,dca:dcaTotal,total:insCV+sis+p3+dcaTotal};
+}
+function updateScenario(){
+  const rS=+document.getElementById('sliderSister').value;
+  const rP=+document.getElementById('sliderPool3').value;
+  const rD=+document.getElementById('sliderDca').value;
+  document.getElementById('sliderSisterVal').textContent=rS+'%';
+  document.getElementById('sliderPool3Val').textContent=rP+'%';
+  document.getElementById('sliderDcaVal').textContent=rD+'%';
+
+  const now=new Date();
+  const age=now.getFullYear()-data.profile.birth_year;
+  const yearsLeft=Math.max(1,data.profile.target_age-age);
+  const result=projectScenario(rS,rP,rD,yearsLeft);
+
+  document.getElementById('scenarioTotal').textContent=fmt(result.total);
+  document.getElementById('scenarioTotal').style.color=result.total>=data.profile.target_amount?'var(--green)':'var(--gold)';
+  document.getElementById('scenarioBreakdown').innerHTML=`
+    <div class="stat-row"><span class="stat-label">保险现金价值</span><span class="stat-value">${fmt(result.insurance)}</span></div>
+    <div class="stat-row"><span class="stat-label">姐姐投资</span><span class="stat-value">${fmt(result.sister)}</span></div>
+    <div class="stat-row"><span class="stat-label">第三池</span><span class="stat-value">${fmt(result.pool3)}</span></div>
+    <div class="stat-row"><span class="stat-label">定投积累</span><span class="stat-value">${fmt(result.dca)}</span></div>
+  `;
+
+  // Trajectory chart
+  const labels=[],insD=[],sisD=[],p3D=[],dcaD=[],totalD=[];
+  for(let y=0;y<=yearsLeft;y++){
+    labels.push(`${age+y}岁`);
+    const r=projectScenario(rS,rP,rD,y);
+    insD.push(r.insurance);sisD.push(r.sister);p3D.push(r.pool3);dcaD.push(r.dca);totalD.push(r.total);
+  }
+  getChart('scenarioChart',{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'保险',data:insD,borderColor:chartColors.gold,backgroundColor:'transparent',tension:.3,borderWidth:2},
+      {label:'姐姐投资',data:sisD,borderColor:chartColors.red,backgroundColor:'transparent',tension:.3,borderWidth:2},
+      {label:'第三池',data:p3D,borderColor:chartColors.blue,backgroundColor:'transparent',tension:.3,borderWidth:2},
+      {label:'定投',data:dcaD,borderColor:chartColors.green,backgroundColor:'transparent',tension:.3,borderWidth:2},
+      {label:'总计',data:totalD,borderColor:'#fff',backgroundColor:'rgba(255,255,255,.05)',fill:true,tension:.3,borderWidth:2.5}
+    ]},
+    options:{
+      scales:{y:{ticks:{callback:v=>fmt(v)}}},
+      plugins:{legend:{position:'bottom',labels:{padding:12,usePointStyle:true,pointStyle:'circle'}}}
+    }
+  });
+
+  // Comparison table
+  const presetNames={conservative:'保守',moderate:'中等',aggressive:'进取',radical:'激进'};
+  let html='<thead><tr><th>方案</th><th>姐姐</th><th>第三池</th><th>定投</th><th>保险</th><th>总计</th></tr></thead><tbody>';
+  for(const[k,v]of Object.entries(PRESETS)){
+    const r=projectScenario(v.sister,v.pool3,v.dca,yearsLeft);
+    const color=r.total>=data.profile.target_amount?'var(--green)':'var(--text)';
+    html+=`<tr><td>${presetNames[k]}</td><td>${v.sister}%</td><td>${v.pool3}%</td><td>${v.dca}%</td><td>${fmt(r.insurance)}</td><td style="color:${color};font-weight:600">${fmt(r.total)}</td></tr>`;
+  }
+  html+='</tbody>';
+  document.getElementById('comparisonTable').innerHTML=html;
+}
+
+// ===== TAB 4: DCA =====
+function setDca(amount){document.getElementById('dcaAmount').value=amount;calcDca()}
+function calcDca(){
+  const monthly=+document.getElementById('dcaAmount').value||0;
+  const annualR=+document.getElementById('dcaReturn').value/100||0;
+  const years=+document.getElementById('dcaYears').value||0;
+  const months=years*12;
+  const mr=annualR/12;
+  let total=0,investedArr=[],totalArr=[],labels=[];
+  for(let m=0;m<=months;m++){
+    if(m>0)total=total*(1+mr)+monthly;
+    const inv=monthly*m;
+    if(m%12===0){labels.push(m/12+'年');investedArr.push(inv);totalArr.push(total)}
+  }
+  const totalInv=monthly*months;
+  const profit=total-totalInv;
+  document.getElementById('dcaEnd').textContent=fmt(total);
+  document.getElementById('dcaInvested').textContent=fmt(totalInv);
+  document.getElementById('dcaProfit').textContent='+'+fmt(profit);
+  document.getElementById('dcaMultiple').textContent=(totalInv>0?(total/totalInv).toFixed(2):'0')+'x';
+
+  getChart('dcaChart',{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'总价值',data:totalArr,borderColor:chartColors.gold,backgroundColor:'rgba(212,165,116,.15)',fill:true,tension:.3},
+      {label:'投入本金',data:investedArr,borderColor:chartColors.text2,backgroundColor:'rgba(139,148,158,.1)',fill:true,tension:.3}
+    ]},
+    options:{
+      scales:{y:{ticks:{callback:v=>fmt(v)}}},
+      plugins:{legend:{position:'bottom',labels:{padding:12,usePointStyle:true,pointStyle:'circle'}}}
+    }
+  });
+}
+
+// ===== TAB 5: INSURANCE =====
+function renderInsurance(){
+  const year=getInsuranceYear();
+  const paid=getPaidSoFar();
+  const cv=getInsuranceCV();
+  const loss=paid-cv;
+  // Break-even: find year where CV >= total paid (500k after year 5)
+  const totalPremium=500000;
+  let breakEven='—';
+  for(let i=1;i<=83;i++){
+    const p=Math.min(i,5)*100000;
+    if(CV_TABLE[i]>=p){breakEven=`第${i}年`;break}
+  }
+
+  document.getElementById('insCurrentYear').textContent=`第${year}年`;
+  document.getElementById('insPaid').textContent=fmt(paid);
+  document.getElementById('insCV').textContent=fmt(cv);
+  document.getElementById('insLoss').textContent=(loss>0?'-':'+') + fmt(Math.abs(loss));
+  document.getElementById('insBreakEven').textContent=breakEven;
+
+  // Ring
+  const progress=Math.min(year,5)/5;
+  const r=48,c=2*Math.PI*r;
+  document.getElementById('insuranceRing').innerHTML=`
+    <circle cx="60" cy="60" r="${r}" fill="none" stroke="#21262d" stroke-width="8"/>
+    <circle cx="60" cy="60" r="${r}" fill="none" stroke="#d4a574" stroke-width="8"
+      stroke-dasharray="${c*progress} ${c*(1-progress)}" stroke-dashoffset="${c*0.25}"
+      stroke-linecap="round" transform="rotate(-90 60 60)"/>
+    <text x="60" y="55" text-anchor="middle" fill="#d4a574" font-size="18" font-weight="700" font-family="Playfair Display">${Math.min(year,5)}/5</text>
+    <text x="60" y="72" text-anchor="middle" fill="#8b949e" font-size="10">缴费进度</text>
+  `;
+
+  // Chart
+  const labels=[],values=[],bgColors=[];
+  const milestones={};
+  for(let i=1;i<=83;i++){
+    labels.push(`第${i}年`);
+    values.push(CV_TABLE[i]);
+    bgColors.push(i===year?'rgba(212,165,116,.3)':'transparent');
+    if(CV_TABLE[i]>=500000&&!milestones['回本'])milestones['回本']=i;
+    if(CV_TABLE[i]>=1000000&&!milestones['100万'])milestones['100万']=i;
+    if(CV_TABLE[i]>=2000000&&!milestones['200万'])milestones['200万']=i;
+    if(CV_TABLE[i]>=5000000&&!milestones['500万'])milestones['500万']=i;
+  }
+  getChart('insChart',{
+    type:'line',
+    data:{labels,datasets:[{label:'现金价值',data:values,borderColor:chartColors.gold,backgroundColor:'rgba(212,165,116,.1)',fill:true,tension:.3,pointRadius:0,pointHitRadius:6}]},
+    options:{
+      scales:{y:{ticks:{callback:v=>fmt(v)}}},
+      plugins:{legend:{display:false}}
+    }
+  });
+
+  // Table
+  let html='<thead><tr><th>保单年度</th><th>现金价值</th><th>累计保费</th><th>盈亏</th><th>备注</th></tr></thead><tbody>';
+  for(let i=1;i<=83;i++){
+    const p=Math.min(i,5)*100000;
+    const pl=CV_TABLE[i]-p;
+    const cls=i===year?'highlight':'';
+    let note='';
+    for(const[k,v]of Object.entries(milestones)){if(v===i)note+=`<span class="milestone">${k}</span> `}
+    html+=`<tr class="${cls}"><td>第${i}年</td><td>${fmtFull(CV_TABLE[i])}</td><td>${fmtFull(p)}</td><td style="color:${pl>=0?'var(--green)':'var(--red)'}">${pl>=0?'+':''}${fmtFull(pl)}</td><td>${note}</td></tr>`;
+  }
+  html+='</tbody>';
+  document.getElementById('insTable').innerHTML=html;
+}
+
+// ===== INIT =====
+document.getElementById('headerDate').textContent=new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+renderOverview();
+</script>
+</body>
+</html>
