@@ -131,6 +131,21 @@ input[type=range]::-webkit-slider-thumb{
 .ring-svg{width:120px;height:120px;flex-shrink:0}
 .ring-info{flex:1}
 
+/* ETF Tracker */
+  .etf-realtime { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+  .etf-rt-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:16px; text-align:center; }
+  .etf-rt-name { font-size:.85rem; color:var(--text2); margin-bottom:4px; }
+  .etf-rt-price { font-size:1.6rem; font-family:'Playfair Display',serif; font-weight:700; }
+  .etf-rt-change { font-size:.9rem; font-weight:600; margin-top:4px; }
+  .etf-rt-extra { font-size:.75rem; color:var(--text3); margin-top:8px; }
+  .etf-section { margin-bottom:24px; }
+  .etf-section h3 { font-family:'Playfair Display',serif; color:var(--gold); font-size:1.1rem; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+  .dca-sim-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .dca-sim-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px; }
+  .dca-sim-card h4 { font-size:.85rem; color:var(--text2); margin-bottom:10px; }
+  .dca-sim-val { font-size:1.2rem; font-weight:700; font-family:'DM Sans',sans-serif; }
+  .dca-sim-detail { font-size:.75rem; color:var(--text2); margin-top:6px; }
+
 /* Responsive */
 @media(max-width:768px){
   .hero-num{font-size:2.2rem}
@@ -138,6 +153,8 @@ input[type=range]::-webkit-slider-thumb{
   .card-grid{grid-template-columns:1fr}
   .tab-content{padding:16px}
   .ring-container{flex-direction:column;align-items:flex-start}
+    .etf-realtime { grid-template-columns:1fr; }
+    .dca-sim-grid { grid-template-columns:1fr; }
 }
 
 /* Input group for calculator */
@@ -170,6 +187,7 @@ input[type=range]::-webkit-slider-thumb{
   <button class="tab-btn" data-tab="scenario">场景模拟</button>
   <button class="tab-btn" data-tab="dca">定投计算器</button>
   <button class="tab-btn" data-tab="insurance">保险追踪</button>
+  <button class="tab-btn" data-tab="etf">ETF追踪</button>
 </nav>
 
 <!-- Tab 1: 资产总览 -->
@@ -311,6 +329,36 @@ input[type=range]::-webkit-slider-thumb{
   </div>
 </section>
 
+<section class="tab-content" id="tab-etf">
+  <div class="etf-section">
+    <h3>实时行情</h3>
+    <div class="etf-realtime" id="etfRealtime">
+      <div style="color:var(--text2);padding:20px;text-align:center;">加载中...</div>
+    </div>
+    <div style="font-size:.75rem;color:var(--text3);text-align:right;margin-top:4px;" id="etfUpdateTime"></div>
+  </div>
+  <div class="etf-section">
+    <h3>走势对比 (归一化)</h3>
+    <div class="chart-wrap"><canvas id="etfCompareChart"></canvas></div>
+  </div>
+  <div class="etf-section">
+    <h3>定投模拟</h3>
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+      <label style="font-size:.85rem;color:var(--text2);">模拟起始</label>
+      <input type="date" id="dcaSimStart" value="2025-01-01" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:.85rem;">
+      <label style="font-size:.85rem;color:var(--text2);">每月定投日</label>
+      <select id="dcaSimDay" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:.85rem;">
+        <option value="1">每月1日</option>
+        <option value="15">每月15日</option>
+        <option value="28">每月28日</option>
+      </select>
+      <button class="btn-gold" onclick="simulateDCA()" style="padding:6px 16px;font-size:.85rem;">计算</button>
+    </div>
+    <div class="dca-sim-grid" id="dcaSimResults"></div>
+    <div class="chart-wrap" style="margin-top:16px;"><canvas id="dcaSimChart"></canvas></div>
+  </div>
+</section>
+
 <script>
 // ===== DATA =====
 const CV_TABLE=[0,17542,45615,85936,146084,214109,294165,377937,465489,556869,652119,674948,698588,723069,748424,774688,801897,830069,859231,889416,920662,953005,986484,1021138,1057008,1094138,1132570,1172352,1213530,1256152,1300271,1345938,1393207,1442136,1492781,1545205,1599468,1655636,1713776,1773957,1836251,1900730,1967471,2036554,2108059,2182071,2258677,2337968,2420035,2504977,2592893,2683887,2778067,2875544,2976433,3080851,3188920,3300766,3416520,3536316,3660297,3788609,3921403,4058838,4201075,4348284,4500640,4658324,4821524,4990437,5165273,5346252,5533508,5727306,5927875,6135449,6350261,6572568,6802655,7040802,7287278,7542386,7806467,8079849];
@@ -393,6 +441,7 @@ Chart.defaults.font.family="'DM Sans',sans-serif";
 // ===== TAB SWITCHING =====
 document.querySelectorAll('.tab-btn').forEach(b=>{
   b.addEventListener('click',()=>{
+    if(etfRealtimeTimer){clearInterval(etfRealtimeTimer);etfRealtimeTimer=null;}
     document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(x=>x.classList.remove('active'));
     b.classList.add('active');
@@ -406,6 +455,7 @@ function refreshCurrentTab(tab){
   else if(tab==='scenario')updateScenario();
   else if(tab==='dca')calcDca();
   else if(tab==='insurance')renderInsurance();
+  else if(tab==='etf')renderETF();
 }
 
 // ===== TAB 1: OVERVIEW =====
@@ -717,6 +767,264 @@ function renderInsurance(){
   }
   html+='</tbody>';
   document.getElementById('insTable').innerHTML=html;
+}
+
+// ===== TAB 6: ETF TRACKER =====
+const ETF_LIST = [
+  { code:'159338', sina:'sz159338', market:0, name:'中证A500 ETF', color:'#58a6ff', monthlyAmount:5000 },
+  { code:'515080', sina:'sh515080', market:1, name:'中证红利ETF', color:'#d4a574', monthlyAmount:3750 },
+  { code:'159632', sina:'sz159632', market:0, name:'纳斯达克100 ETF', color:'#3fb950', monthlyAmount:2500 },
+];
+
+let etfKlineCache = {};
+let etfRealtimeTimer = null;
+
+function fetchETFRealtime() {
+  const promises = ETF_LIST.map(etf => {
+    return new Promise((resolve) => {
+      const cbName = 'etfcb_' + etf.code + '_' + Date.now();
+      window[cbName] = function(data) {
+        delete window[cbName];
+        document.body.removeChild(script);
+        resolve({ etf, data: data.data });
+      };
+      const script = document.createElement('script');
+      script.src = `https://push2.eastmoney.com/api/qt/stock/get?secid=${etf.market}.${etf.code}&fields=f43,f44,f45,f46,f47,f57,f58,f169,f170,f171&cb=${cbName}`;
+      script.onerror = () => { delete window[cbName]; resolve({ etf, data: null }); };
+      document.body.appendChild(script);
+      setTimeout(() => { if (window[cbName]) { delete window[cbName]; resolve({ etf, data: null }); } }, 5000);
+    });
+  });
+
+  Promise.all(promises).then(results => {
+    const container = document.getElementById('etfRealtime');
+    container.innerHTML = results.map(({ etf, data }) => {
+      if (!data) return `<div class="etf-rt-card"><div class="etf-rt-name">${etf.name}</div><div style="color:var(--text3)">加载失败</div></div>`;
+      const price = (data.f43 / 100).toFixed(3);
+      const changePct = (data.f170 / 100).toFixed(2);
+      const high = (data.f44 / 100).toFixed(3);
+      const low = (data.f45 / 100).toFixed(3);
+      const open = (data.f46 / 100).toFixed(3);
+      const isUp = data.f170 >= 0;
+      const color = isUp ? 'var(--red)' : 'var(--green)';
+      const sign = isUp ? '+' : '';
+      return `<div class="etf-rt-card" style="border-left:3px solid ${etf.color}">
+        <div class="etf-rt-name">${etf.name} (${etf.code})</div>
+        <div class="etf-rt-price" style="color:${color}">${price}</div>
+        <div class="etf-rt-change" style="color:${color}">${sign}${changePct}%</div>
+        <div class="etf-rt-extra">开:${open} 高:${high} 低:${low}</div>
+      </div>`;
+    }).join('');
+    const now = new Date();
+    document.getElementById('etfUpdateTime').textContent = '更新于 ' + now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0') + ':' + now.getSeconds().toString().padStart(2,'0');
+  });
+}
+
+function fetchETFKlines() {
+  const promises = ETF_LIST.map(etf => {
+    if (etfKlineCache[etf.code]) return Promise.resolve({ etf, data: etfKlineCache[etf.code] });
+    return fetch(`https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=${etf.sina}&scale=240&ma=no&datalen=500`)
+      .then(r => r.json())
+      .then(data => { etfKlineCache[etf.code] = data; return { etf, data }; })
+      .catch(() => ({ etf, data: [] }));
+  });
+  return Promise.all(promises);
+}
+
+function renderETFCompare() {
+  fetchETFKlines().then(results => {
+    const datasets = [];
+    let commonDates = null;
+
+    results.forEach(({ etf, data }) => {
+      if (!data || !data.length) return;
+      const dates = data.map(d => d.day);
+      if (!commonDates) commonDates = new Set(dates);
+      else commonDates = new Set([...commonDates].filter(d => dates.includes(d)));
+    });
+
+    if (!commonDates || commonDates.size === 0) return;
+    const sortedDates = [...commonDates].sort();
+
+    results.forEach(({ etf, data }) => {
+      if (!data || !data.length) return;
+      const dateMap = {};
+      data.forEach(d => { dateMap[d.day] = parseFloat(d.close); });
+      const basePrice = dateMap[sortedDates[0]];
+      if (!basePrice) return;
+      datasets.push({
+        label: etf.name,
+        data: sortedDates.map(d => dateMap[d] ? (dateMap[d] / basePrice * 100).toFixed(2) : null),
+        borderColor: etf.color,
+        backgroundColor: 'transparent',
+        tension: 0.3,
+        borderWidth: 2,
+        pointRadius: 0,
+      });
+    });
+
+    const labelInterval = Math.max(1, Math.floor(sortedDates.length / 20));
+    const labels = sortedDates.map((d, i) => i % labelInterval === 0 ? d.slice(5) : '');
+
+    getChart('etfCompareChart', {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        scales: {
+          y: { ticks: { callback: v => v + '%' } },
+          x: { ticks: { maxRotation: 45 } }
+        },
+        plugins: {
+          legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, pointStyle: 'circle' } },
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y + '%' } }
+        }
+      }
+    });
+  });
+}
+
+function simulateDCA() {
+  const startDate = document.getElementById('dcaSimStart').value;
+  const investDay = parseInt(document.getElementById('dcaSimDay').value);
+
+  if (!startDate) { alert('请选择起始日期'); return; }
+
+  fetchETFKlines().then(results => {
+    const container = document.getElementById('dcaSimResults');
+    const chartDatasets = [];
+    const allLabels = new Set();
+
+    const cards = results.map(({ etf, data }) => {
+      if (!data || !data.length) return `<div class="dca-sim-card"><h4>${etf.name}</h4><div style="color:var(--text3)">数据不足</div></div>`;
+
+      const dateMap = {};
+      data.forEach(d => { dateMap[d.day] = parseFloat(d.close); });
+
+      let totalShares = 0;
+      let totalInvested = 0;
+      let investDates = [];
+      const valueOverTime = [];
+
+      const start = new Date(startDate);
+      const now = new Date();
+      let cursor = new Date(start.getFullYear(), start.getMonth(), investDay);
+      if (cursor < start) cursor.setMonth(cursor.getMonth() + 1);
+
+      while (cursor <= now) {
+        const dateStr = cursor.toISOString().slice(0, 10);
+        let price = dateMap[dateStr];
+        if (!price) {
+          for (let d = 1; d <= 5; d++) {
+            const alt = new Date(cursor);
+            alt.setDate(alt.getDate() + d);
+            const altStr = alt.toISOString().slice(0, 10);
+            if (dateMap[altStr]) { price = dateMap[altStr]; break; }
+          }
+        }
+        if (price) {
+          const shares = etf.monthlyAmount / price;
+          totalShares += shares;
+          totalInvested += etf.monthlyAmount;
+          investDates.push({ date: dateStr, price, shares, totalInvested, totalShares });
+        }
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+
+      if (totalInvested === 0) return `<div class="dca-sim-card"><h4>${etf.name}</h4><div style="color:var(--text3)">定投期内无数据</div></div>`;
+
+      const latestPrice = parseFloat(data[data.length - 1].close);
+      const currentValue = totalShares * latestPrice;
+      const profit = currentValue - totalInvested;
+      const profitPct = (profit / totalInvested * 100).toFixed(2);
+      const months = investDates.length;
+
+      const vot = [];
+      let runShares = 0, runInvested = 0, investIdx = 0;
+      data.forEach(d => {
+        const dDate = d.day;
+        while (investIdx < investDates.length && investDates[investIdx].date <= dDate) {
+          runShares = investDates[investIdx].totalShares;
+          runInvested = investDates[investIdx].totalInvested;
+          investIdx++;
+        }
+        if (runShares > 0) {
+          allLabels.add(dDate);
+          vot.push({ date: dDate, value: runShares * parseFloat(d.close), invested: runInvested });
+        }
+      });
+
+      chartDatasets.push({
+        label: etf.name + ' 市值',
+        data: vot.map(v => ({ x: v.date, y: Math.round(v.value) })),
+        borderColor: etf.color,
+        backgroundColor: 'transparent',
+        tension: 0.3,
+        borderWidth: 2,
+        pointRadius: 0,
+        _rawData: vot,
+      });
+
+      const isProfit = profit >= 0;
+      const profitColor = isProfit ? 'var(--red)' : 'var(--green)';
+      return `<div class="dca-sim-card" style="border-left:3px solid ${etf.color}">
+        <h4>${etf.name}</h4>
+        <div class="dca-sim-val" style="color:${profitColor}">${fmt(currentValue)}</div>
+        <div class="dca-sim-detail">
+          投入 ${fmt(totalInvested)} · ${months}期<br>
+          盈亏 <span style="color:${profitColor}">${isProfit?'+':''}${fmt(profit)} (${isProfit?'+':''}${profitPct}%)</span><br>
+          持有 ${totalShares.toFixed(2)} 份 · 均价 ${(totalInvested/totalShares).toFixed(3)}
+        </div>
+      </div>`;
+    });
+
+    container.innerHTML = cards.join('');
+
+    if (chartDatasets.length > 0) {
+      const sortedLabels = [...allLabels].sort();
+      const labelInterval = Math.max(1, Math.floor(sortedLabels.length / 15));
+
+      if (chartDatasets[0]._rawData) {
+        chartDatasets.push({
+          label: '总投入',
+          data: chartDatasets[0]._rawData.map(v => ({ x: v.date, y: Math.round(v.invested) })),
+          borderColor: 'rgba(255,255,255,0.3)',
+          backgroundColor: 'transparent',
+          borderWidth: 1,
+          borderDash: [4, 4],
+          tension: 0.3,
+          pointRadius: 0,
+        });
+      }
+
+      getChart('dcaSimChart', {
+        type: 'line',
+        data: {
+          labels: sortedLabels.map((d, i) => i % labelInterval === 0 ? d.slice(5) : ''),
+          datasets: chartDatasets.map(ds => ({
+            ...ds,
+            data: sortedLabels.map(d => {
+              const point = (ds._rawData || ds.data).find(p => (p.date || p.x) === d);
+              return point ? (point.y || point.value || null) : null;
+            }),
+            _rawData: undefined,
+          }))
+        },
+        options: {
+          scales: { y: { ticks: { callback: v => fmt(v) } } },
+          plugins: {
+            legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, pointStyle: 'circle' } }
+          }
+        }
+      });
+    }
+  });
+}
+
+function renderETF() {
+  fetchETFRealtime();
+  renderETFCompare();
+  if (etfRealtimeTimer) clearInterval(etfRealtimeTimer);
+  etfRealtimeTimer = setInterval(fetchETFRealtime, 10000);
 }
 
 // ===== INIT =====
