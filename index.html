@@ -86,7 +86,7 @@ h1,h2,h3,.hero-num{font-family:'Playfair Display',serif}
   padding:10px 24px;border:none;border-radius:var(--radius-sm);cursor:pointer;
   font-family:'DM Sans',sans-serif;font-size:.85rem;font-weight:600;transition:.2s;
 }
-.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold3));color:#0d1117}
+.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold3));color:#0d1117;border:none;border-radius:var(--radius-sm);cursor:pointer;font-weight:600;font-family:'DM Sans',sans-serif}
 .btn-gold:hover{filter:brightness(1.1);transform:translateY(-1px)}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2)}
 .btn-outline:hover{border-color:var(--gold);color:var(--gold)}
@@ -820,34 +820,32 @@ function fetchETFRealtime() {
   });
 }
 
-function fetchETFKlineJSONP(etf) {
-  return new Promise((resolve) => {
-    if (etfKlineCache[etf.code]) { resolve({ etf, data: etfKlineCache[etf.code] }); return; }
-    const cbName = 'klinecb_' + etf.code + '_' + Date.now();
-    window[cbName] = function(resp) {
-      delete window[cbName];
-      try { document.body.removeChild(script); } catch(e) {}
-      const klines = (resp && resp.data && resp.data.klines) || [];
-      const parsed = klines.map(k => {
-        const p = k.split(',');
-        return { day: p[0], open: p[1], close: p[2], high: p[3], low: p[4], volume: p[5] };
-      });
-      etfKlineCache[etf.code] = parsed;
-      resolve({ etf, data: parsed });
-    };
-    const script = document.createElement('script');
-    script.src = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${etf.market}.${etf.code}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56&klt=101&fqt=1&beg=20240101&end=20270101&cb=${cbName}`;
-    script.onerror = () => { delete window[cbName]; resolve({ etf, data: [] }); };
-    document.body.appendChild(script);
-    setTimeout(() => { if (window[cbName]) { window[cbName]({ data: { klines: [] } }); } }, 8000);
-  });
-}
 function fetchETFKlines() {
-  return Promise.all(ETF_LIST.map(etf => fetchETFKlineJSONP(etf)));
+  // 腾讯K线接口，支持CORS(Access-Control-Allow-Origin: *)
+  const promises = ETF_LIST.map(etf => {
+    if (etfKlineCache[etf.code]) return Promise.resolve({ etf, data: etfKlineCache[etf.code] });
+    const qqCode = etf.sina; // sh515080 / sz159338 格式
+    const url = `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${qqCode},day,2024-01-01,2027-01-01,800,qfq`;
+    return fetch(url).then(r => r.text()).then(text => {
+      // 响应格式: kline_dayqfq={"code":0,"data":{"sz159338":{"day":[...]}}}
+      const jsonStr = text.indexOf('=') >= 0 ? text.substring(text.indexOf('=') + 1) : text;
+      const json = JSON.parse(jsonStr);
+      const stockData = json.data && json.data[qqCode];
+      const klines = (stockData && (stockData.qfqday || stockData.day)) || [];
+      const parsed = klines.map(k => ({
+        day: k[0], open: k[1], close: k[2], high: k[3], low: k[4], volume: k[5]
+      }));
+      etfKlineCache[etf.code] = parsed;
+      return { etf, data: parsed };
+    }).catch(e => { console.error('K线获取失败:', etf.name, e); return { etf, data: [] }; });
+  });
+  return Promise.all(promises);
 }
 
 function renderETFCompare() {
   fetchETFKlines().then(results => {
+    const hasData = results.some(r => r.data && r.data.length > 0);
+    if (!hasData) { console.warn('走势数据为空'); return; }
     const datasets = [];
     let commonDates = null;
 
@@ -904,7 +902,14 @@ function simulateDCA() {
 
   if (!startDate) { alert('请选择起始日期'); return; }
 
+  document.getElementById('dcaSimResults').innerHTML = '<div style="color:var(--text2);padding:20px;text-align:center;grid-column:1/-1;">正在获取数据...</div>';
+
   fetchETFKlines().then(results => {
+    const hasData = results.some(r => r.data && r.data.length > 0);
+    if (!hasData) {
+      document.getElementById('dcaSimResults').innerHTML = '<div style="color:var(--red);padding:20px;text-align:center;grid-column:1/-1;">K线数据获取失败，请检查网络</div>';
+      return;
+    }
     const container = document.getElementById('dcaSimResults');
     const chartDatasets = [];
     const allLabels = new Set();
