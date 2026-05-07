@@ -820,15 +820,30 @@ function fetchETFRealtime() {
   });
 }
 
-function fetchETFKlines() {
-  const promises = ETF_LIST.map(etf => {
-    if (etfKlineCache[etf.code]) return Promise.resolve({ etf, data: etfKlineCache[etf.code] });
-    return fetch(`https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=${etf.sina}&scale=240&ma=no&datalen=500`)
-      .then(r => r.json())
-      .then(data => { etfKlineCache[etf.code] = data; return { etf, data }; })
-      .catch(() => ({ etf, data: [] }));
+function fetchETFKlineJSONP(etf) {
+  return new Promise((resolve) => {
+    if (etfKlineCache[etf.code]) { resolve({ etf, data: etfKlineCache[etf.code] }); return; }
+    const cbName = 'klinecb_' + etf.code + '_' + Date.now();
+    window[cbName] = function(resp) {
+      delete window[cbName];
+      try { document.body.removeChild(script); } catch(e) {}
+      const klines = (resp && resp.data && resp.data.klines) || [];
+      const parsed = klines.map(k => {
+        const p = k.split(',');
+        return { day: p[0], open: p[1], close: p[2], high: p[3], low: p[4], volume: p[5] };
+      });
+      etfKlineCache[etf.code] = parsed;
+      resolve({ etf, data: parsed });
+    };
+    const script = document.createElement('script');
+    script.src = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${etf.market}.${etf.code}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56&klt=101&fqt=1&beg=20240101&end=20270101&cb=${cbName}`;
+    script.onerror = () => { delete window[cbName]; resolve({ etf, data: [] }); };
+    document.body.appendChild(script);
+    setTimeout(() => { if (window[cbName]) { window[cbName]({ data: { klines: [] } }); } }, 8000);
   });
-  return Promise.all(promises);
+}
+function fetchETFKlines() {
+  return Promise.all(ETF_LIST.map(etf => fetchETFKlineJSONP(etf)));
 }
 
 function renderETFCompare() {
