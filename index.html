@@ -372,12 +372,14 @@ function getPaidSoFar(){const y=getInsuranceYear();return Math.min(y,5)*100000}
 function getAsset(id){return data.assets.find(a=>a.id===id)}
 function getTotalAssets(){
   const ins=getInsuranceCV();
-  const sis=getAsset('sister').current_value;
-  const p3=getAsset('pool3').current_value;
-  return ins+sis+p3;
+  let total=ins;
+  ['sister','cash','fund','pool3'].forEach(id=>{const a=getAsset(id);if(a)total+=a.current_value});
+  return total;
 }
 function getTotalInvested(){
-  return getPaidSoFar()+getAsset('sister').invested+getAsset('pool3').invested;
+  let total=getPaidSoFar();
+  ['sister','cash','fund','pool3'].forEach(id=>{const a=getAsset(id);if(a)total+=a.invested});
+  return total;
 }
 
 // ===== CHARTS REGISTRY =====
@@ -417,13 +419,21 @@ function renderOverview(){
   const invested=getTotalInvested();
   const pl=total-invested;
   document.getElementById('totalAssets').textContent=fmt(total);
-  document.getElementById('totalPL').innerHTML=`总投入 ${fmt(invested)} &nbsp;|&nbsp; 盈亏 <span style="color:${pl>=0?'var(--green)':'var(--red)'}">${pl>=0?'+':''}${fmt(pl)} (${pl>=0?'+':''}${(pl/invested*100).toFixed(1)}%)</span>`;
+  document.getElementById('totalPL').innerHTML=`总投入 ${fmt(invested)} &nbsp;|&nbsp; 盈亏 <span style="color:${pl>=0?'var(--green)':'var(--red)'}">${pl>=0?'+':''}${fmt(pl)} (${invested?(pl/invested*100).toFixed(1):'0'}%)</span>`;
 
-  const ins=getInsuranceCV(), sis=getAsset('sister').current_value, p3=getAsset('pool3').current_value;
-  // Pie
+  const ins=getInsuranceCV();
+  const sisA=getAsset('sister'), p3A=getAsset('pool3');
+  const cashA=getAsset('cash'), fundA=getAsset('fund');
+  const sis=sisA?sisA.current_value:0, p3=p3A?p3A.current_value:0;
+  const cash=cashA?cashA.current_value:0, fund=fundA?fundA.current_value:0;
+
+  // Pie - all pools
+  const pieLabels=['保险','姐姐投资','现金储备','公积金(受限)','第三池'];
+  const pieData=[ins,sis,cash,fund,p3];
+  const pieColors=[chartColors.gold,chartColors.red,'#8b949e','#58a6ff',chartColors.blue];
   getChart('pieChart',{
     type:'doughnut',
-    data:{labels:['保险','姐姐投资','第三池'],datasets:[{data:[ins,sis,p3],backgroundColor:[chartColors.gold,chartColors.red,chartColors.blue],borderWidth:0,hoverOffset:8}]},
+    data:{labels:pieLabels,datasets:[{data:pieData,backgroundColor:pieColors,borderWidth:0,hoverOffset:8}]},
     options:{cutout:'65%',plugins:{legend:{position:'bottom',labels:{padding:16,usePointStyle:true,pointStyle:'circle'}}}}
   });
 
@@ -431,14 +441,18 @@ function renderOverview(){
   const cards=document.getElementById('assetCards');
   const paid=getPaidSoFar();
   const insPL=ins-paid;
-  const sisA=getAsset('sister'), p3A=getAsset('pool3');
-  const sisPL=sisA.current_value-sisA.invested, p3PL=p3A.current_value-p3A.invested;
+  const sisPL=sisA?sisA.current_value-sisA.invested:0;
+  const cashPL=cashA?cashA.current_value-cashA.invested:0;
+  const fundPL=fundA?fundA.current_value-fundA.invested:0;
+  const p3PL=p3A?p3A.current_value-p3A.invested:0;
   const nextPayDate=getInsuranceYear()<=4?`${2023+getInsuranceYear()}-04-26`:'已缴清';
 
   cards.innerHTML=`
     ${assetCard('保险','昆仑健康乐享年年',paid,ins,insPL,`下次缴费: ${nextPayDate}`)}
-    ${assetCard('高风险','姐姐风险投资',sisA.invested,sisA.current_value,sisPL,`预期年化: ${pct(sisA.expected_return)}`,'sister')}
-    ${assetCard('红利+指数','第三池(红利+指数)',p3A.invested,p3A.current_value,p3PL,`预期年化: ${pct(p3A.expected_return)}`,'pool3')}
+    ${assetCard('高风险','姐姐风险投资',sisA?sisA.invested:0,sis,sisPL,`预期年化: ${sisA?pct(sisA.expected_return):'--'}`,'sister')}
+    ${assetCard('现金','现金储备',cashA?cashA.invested:0,cash,cashPL,`银行卡+日常账户`,'cash')}
+    ${assetCard('受限','公积金(受限)',fundA?fundA.invested:0,fund,fundPL,`月缴存: ${fundA&&fundA.monthly_deposit?fmt(fundA.monthly_deposit):'--'} · 利率1.5%`,'fund')}
+    ${assetCard('红利+指数','第三池(红利+指数)',p3A?p3A.invested:0,p3,p3PL,`预期年化: ${p3A?pct(p3A.expected_return):'--'}`,'pool3')}
   `;
 }
 function assetCard(tag,name,invested,current,pl,extra,editId){
@@ -471,9 +485,13 @@ function startEdit(el,assetId){
   input.addEventListener('keydown',e=>{if(e.key==='Enter')finish();if(e.key==='Escape'){renderOverview()}});
 }
 function recordSnapshot(){
-  const ins=getInsuranceCV(),sis=getAsset('sister').current_value,p3=getAsset('pool3').current_value;
-  const total=ins+sis+p3;
-  data.history.push({date:new Date().toISOString().slice(0,10),total,breakdown:{insurance:Math.round(ins),sister:Math.round(sis),pool3:Math.round(p3)}});
+  const ins=getInsuranceCV();
+  const sis=getAsset('sister')?getAsset('sister').current_value:0;
+  const cash=getAsset('cash')?getAsset('cash').current_value:0;
+  const fund=getAsset('fund')?getAsset('fund').current_value:0;
+  const p3=getAsset('pool3')?getAsset('pool3').current_value:0;
+  const total=ins+sis+cash+fund+p3;
+  data.history.push({date:new Date().toISOString().slice(0,10),total,breakdown:{insurance:Math.round(ins),sister:Math.round(sis),cash:Math.round(cash),fund:Math.round(fund),pool3:Math.round(p3)}});
   saveData();
   alert('已记录净值快照: '+fmt(total));
 }
